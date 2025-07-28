@@ -1,0 +1,115 @@
+import typing
+
+import matplotlib.pyplot as plt
+import pandas as pd
+
+DATA_2024_FILE = "data/master_sheet_24.csv"
+DATA_2024_FINISH = "data/fp_converted_names.csv"
+
+
+def add_final_finish_to_old_df(
+    old_df: pd.DataFrame, final_df: pd.DataFrame
+) -> pd.DataFrame:
+    # create a dictionary to map player names to their final finish
+    # ignore total points and only use PPG. We don't predict injuries
+    final_ppg_dict = final_df.set_index("Player")["AVG"].to_dict()
+    # add a new column to the old_df with the final finish
+    old_df["Final_PPG"] = old_df["PLAYER NAME"].map(final_ppg_dict)
+    # drop rows where Final_PPG is NaN
+    old_df = old_df[old_df["Final_PPG"].notna()]
+    # any value that has %, remove the % sign and convert to float
+    old_df = old_df.replace("%", "", regex=True)
+    return old_df
+
+
+def split_by_position(df: pd.DataFrame) -> typing.Dict[str, pd.DataFrame]:
+    return {pos: df[df["POS"] == pos] for pos in df["POS"].unique()}
+
+
+def drop_irrelevant_columns(df: pd.DataFrame) -> pd.DataFrame:
+    cols = df.columns.tolist()
+    cols_to_drop = [
+        # c
+        # for c in cols
+        # if "RK" in c
+        # or "BEST" in c
+        # or "WORST" in c
+        # or "TIER" in c
+        # or "DEV" in c
+        # or "POS_AVG" in c
+    ]
+    non_ppr_cols = [
+        col for col in cols if not col.startswith("PPR_") and f"PPR_{col}" in cols
+    ]
+    cols_to_drop.extend(non_ppr_cols)
+    return df.drop(columns=cols_to_drop)
+
+
+def get_correlation(df: pd.DataFrame) -> pd.DataFrame:
+    # drop PLAYER NAME and POS columns
+    df = df.drop(columns=["PLAYER NAME", "POS", "TEAM"])
+    # calculate the correlation matrix
+    correlation_matrix = df.corr()
+    # convert the correlation matrix to a DataFrame
+    correlation_df = correlation_matrix.reset_index().melt(id_vars="index")
+    # only look for correlations with Final_PPG
+    correlation_df = correlation_df[correlation_df["index"] == "Final_PPG"]
+    return correlation_df
+
+
+def plot_correlation(correlation_df: pd.DataFrame, position: str) -> None:
+    plt.figure(figsize=(10, 6))
+    # drop nan values
+    correlation_df = correlation_df.dropna()
+    # sort by value
+    correlation_df = correlation_df.sort_values(by="value", ascending=False)
+    # drop the final_ppg row
+    correlation_df = correlation_df[correlation_df["variable"] != "Final_PPG"]
+    plt.bar(correlation_df["variable"], correlation_df["value"])
+    plt.xticks(rotation=90)
+    plt.title("Correlation with Final PPR PPG")
+    plt.xlabel("Variables")
+    plt.ylabel("Correlation Coefficient")
+    # plot a horizontal red line at y=0.5 and y=-0.5
+    plt.axhline(y=0.5, color="r", linestyle="--", label="0.5 Threshold")
+    plt.axhline(y=-0.5, color="r", linestyle="--", label="-0.5 Threshold")
+    # plot another line at y=0.75 and y=-0.75
+    plt.axhline(y=0.75, color="g", linestyle="--", label="0.75 Threshold")
+    plt.axhline(y=-0.75, color="g", linestyle="--", label="-0.75 Threshold")
+    plt.tight_layout()
+    # set the y-axis limits to -1 and 1
+    plt.ylim(-1, 1)
+    # save image
+    plt.savefig(f"images/correlation_{position}.png")
+    # plt.show()
+
+
+def random_corrections(df: pd.DataFrame) -> pd.DataFrame:
+    # this is a place for random corrections noticed during analysis
+
+    # change tim boyle to a QB in the pos column
+    df.loc[df["PLAYER NAME"] == "TIM BOYLE", "POS"] = "QB"
+
+    # change drew lock to a QB in the pos column
+    df.loc[df["PLAYER NAME"] == "DREW LOCK", "POS"] = "QB"
+    return df
+
+
+def main() -> None:
+    old_df = pd.read_csv(DATA_2024_FILE)
+    old_df = random_corrections(old_df)
+    final_df = pd.read_csv(DATA_2024_FINISH)
+
+    # add the final finish to the old df
+    updated_df = add_final_finish_to_old_df(old_df, final_df)
+    position_dfs = split_by_position(updated_df)
+
+    for pos, df in position_dfs.items():
+        print(f"Position: {pos}")
+        df = drop_irrelevant_columns(df)
+        correlation_df = get_correlation(df)
+        plot_correlation(correlation_df, pos)
+
+
+if __name__ == "__main__":
+    main()

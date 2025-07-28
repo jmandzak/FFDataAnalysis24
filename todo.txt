@@ -1,0 +1,2 @@
+1. Separate out expert projections from normal stats
+2. Add "rookie-less" charts by removing players with 0 ppg
