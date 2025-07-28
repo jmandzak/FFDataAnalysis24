@@ -1,2 +1,4 @@
 1. Separate out expert projections from normal stats
 2. Add "rookie-less" charts by removing players with 0 ppg
+3. Add correlation for first half of season vs second half of season?
+  - More than just correlation for first half vs second half
