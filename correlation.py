@@ -6,6 +6,12 @@ import pandas as pd
 DATA_2024_FILE = "data/master_sheet_24.csv"
 DATA_2024_FINISH = "data/fp_converted_names.csv"
 
+STARTERS_ONLY = True
+DROP_ROOKIES = True
+
+STARTERS_ONLY_STR = "_starters_only" if STARTERS_ONLY else ""
+DROP_ROOKIES_STR = "_drop_rookies" if DROP_ROOKIES else ""
+
 
 def add_final_finish_to_old_df(
     old_df: pd.DataFrame, final_df: pd.DataFrame
@@ -67,7 +73,9 @@ def plot_correlation(correlation_df: pd.DataFrame, position: str) -> None:
     correlation_df = correlation_df[correlation_df["variable"] != "Final_PPG"]
     plt.bar(correlation_df["variable"], correlation_df["value"])
     plt.xticks(rotation=90)
-    plt.title("Correlation with Final PPR PPG")
+    plt.title(
+        f"Correlation with Final PPR PPG{ STARTERS_ONLY_STR}{DROP_ROOKIES_STR} - {position}"
+    )
     plt.xlabel("Variables")
     plt.ylabel("Correlation Coefficient")
     # plot a horizontal red line at y=0.5 and y=-0.5
@@ -80,7 +88,9 @@ def plot_correlation(correlation_df: pd.DataFrame, position: str) -> None:
     # set the y-axis limits to -1 and 1
     plt.ylim(-1, 1)
     # save image
-    plt.savefig(f"images/correlation_{position}.png")
+    plt.savefig(
+        f"images/correlation{STARTERS_ONLY_STR}{DROP_ROOKIES_STR}_{position}.png"
+    )
     # plt.show()
 
 
@@ -95,6 +105,18 @@ def random_corrections(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def keep_top_n_players(df: pd.DataFrame, n: int) -> pd.DataFrame:
+    # keep only the top n players based on Final_PPG
+    top_players = df.nlargest(n, "Final_PPG")
+    return top_players.reset_index(drop=True)
+
+
+def drop_rookies(df: pd.DataFrame) -> pd.DataFrame:
+    # if AVG_FAN PTS is 0, then it's a rookie
+    df = df[df["AVG_FAN PTS"] != 0]
+    return df.reset_index(drop=True)
+
+
 def main() -> None:
     old_df = pd.read_csv(DATA_2024_FILE)
     old_df = random_corrections(old_df)
@@ -106,6 +128,14 @@ def main() -> None:
 
     for pos, df in position_dfs.items():
         print(f"Position: {pos}")
+        # keep only the top 32 players unless it's a WR, then keep top 64
+        if STARTERS_ONLY:
+            if pos == "WR":
+                df = keep_top_n_players(df, 64)
+            else:
+                df = keep_top_n_players(df, 32)
+        if DROP_ROOKIES:
+            df = drop_rookies(df)
         df = drop_irrelevant_columns(df)
         correlation_df = get_correlation(df)
         plot_correlation(correlation_df, pos)
