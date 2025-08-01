@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 DATA_2024_FILE = "data/master_sheet_24.csv"
-DATA_2024_FINISH = "data/fp_converted_names.csv"
+DATA_2024_FINISH = "data/fp_converted_names_standard.csv"
+DATA_2024_FINISH_PPR = "data/fp_converted_names_ppr.csv"
 
 
 def set_window_position() -> None:
@@ -37,10 +38,15 @@ def split_by_position(df: pd.DataFrame) -> typing.Dict[str, pd.DataFrame]:
     return {pos: df[df["POS"] == pos] for pos in df["POS"].unique()}
 
 
-def get_master_df() -> pd.DataFrame:
+def get_master_df(ppr: bool) -> pd.DataFrame:
     # Load the master sheet for 2024
     df = pd.read_csv(DATA_2024_FILE)
-    finish_df = pd.read_csv(DATA_2024_FINISH)
+    if ppr:
+        # Load the PPR converted names if required
+        finish_df = pd.read_csv(DATA_2024_FINISH_PPR)
+    else:
+        # Load the standard converted names
+        finish_df = pd.read_csv(DATA_2024_FINISH)
 
     master_df = add_final_finish_to_old_df(df, finish_df)
 

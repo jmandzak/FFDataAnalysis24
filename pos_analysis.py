@@ -6,8 +6,9 @@ import mplcursors
 import numpy as np
 import pandas as pd
 
-DATA_2024_FILE = "data/master_sheet_24.csv"
-DATA_2024_FINISH = "data/fp_converted_names.csv"
+from utilities import get_master_df
+
+PPR = False
 
 
 def set_window_position() -> None:
@@ -93,13 +94,10 @@ def main() -> None:
     ), "Please provide a position as an argument [QB, RB, WR, TE, K]"
     position = sys.argv[1]
 
-    old_df = pd.read_csv(DATA_2024_FILE)
-    final_df = pd.read_csv(DATA_2024_FINISH)
+    df = get_master_df(PPR)
+    df = remove_players_with_no_stats_last_year(df)
 
-    old_df = add_final_finish_to_old_df(old_df, final_df)
-    old_df = remove_players_with_no_stats_last_year(old_df)
-
-    pos_df = split_by_position(old_df).get(position)
+    pos_df = split_by_position(df).get(position)
     if pos_df is None:
         print(f"No data found for position: {position}")
         return

@@ -3,8 +3,7 @@ import typing
 import matplotlib.pyplot as plt
 import pandas as pd
 
-DATA_2024_FILE = "data/master_sheet_24.csv"
-DATA_2024_FINISH = "data/fp_converted_names.csv"
+from utilities import get_master_df
 
 STARTERS_ONLY = True
 DROP_ROOKIES = True
@@ -12,20 +11,8 @@ DROP_ROOKIES = True
 STARTERS_ONLY_STR = "_starters_only" if STARTERS_ONLY else ""
 DROP_ROOKIES_STR = "_drop_rookies" if DROP_ROOKIES else ""
 
-
-def add_final_finish_to_old_df(
-    old_df: pd.DataFrame, final_df: pd.DataFrame
-) -> pd.DataFrame:
-    # create a dictionary to map player names to their final finish
-    # ignore total points and only use PPG. We don't predict injuries
-    final_ppg_dict = final_df.set_index("Player")["AVG"].to_dict()
-    # add a new column to the old_df with the final finish
-    old_df["Final_PPG"] = old_df["PLAYER NAME"].map(final_ppg_dict)
-    # drop rows where Final_PPG is NaN
-    old_df = old_df[old_df["Final_PPG"].notna()]
-    # any value that has %, remove the % sign and convert to float
-    old_df = old_df.replace("%", "", regex=True)
-    return old_df
+PPR = False
+PPR_STRING = "_ppr" if PPR else "_standard"
 
 
 def split_by_position(df: pd.DataFrame) -> typing.Dict[str, pd.DataFrame]:
@@ -44,10 +31,15 @@ def drop_irrelevant_columns(df: pd.DataFrame) -> pd.DataFrame:
         # or "DEV" in c
         # or "POS_AVG" in c
     ]
-    non_ppr_cols = [
-        col for col in cols if not col.startswith("PPR_") and f"PPR_{col}" in cols
-    ]
-    cols_to_drop.extend(non_ppr_cols)
+    if PPR:
+        non_ppr_cols = [
+            col for col in cols if not col.startswith("PPR_") and f"PPR_{col}" in cols
+        ]
+        cols_to_drop.extend(non_ppr_cols)
+    else:
+        ppr_cols = [col for col in cols if col.startswith("PPR_")]
+        cols_to_drop.extend(ppr_cols)
+
     return df.drop(columns=cols_to_drop)
 
 
@@ -74,7 +66,7 @@ def plot_correlation(correlation_df: pd.DataFrame, position: str) -> None:
     plt.bar(correlation_df["variable"], correlation_df["value"])
     plt.xticks(rotation=90)
     plt.title(
-        f"Correlation with Final PPR PPG{ STARTERS_ONLY_STR}{DROP_ROOKIES_STR} - {position}"
+        f"Correlation with Final PPG{ STARTERS_ONLY_STR}{DROP_ROOKIES_STR}{PPR_STRING} - {position}"
     )
     plt.xlabel("Variables")
     plt.ylabel("Correlation Coefficient")
@@ -89,7 +81,7 @@ def plot_correlation(correlation_df: pd.DataFrame, position: str) -> None:
     plt.ylim(-1, 1)
     # save image
     plt.savefig(
-        f"images/correlation{STARTERS_ONLY_STR}{DROP_ROOKIES_STR}_{position}.png"
+        f"images/correlation{STARTERS_ONLY_STR}{DROP_ROOKIES_STR}{PPR_STRING}_{position}.png"
     )
     # plt.show()
 
@@ -118,13 +110,8 @@ def drop_rookies(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> None:
-    old_df = pd.read_csv(DATA_2024_FILE)
-    old_df = random_corrections(old_df)
-    final_df = pd.read_csv(DATA_2024_FINISH)
-
-    # add the final finish to the old df
-    updated_df = add_final_finish_to_old_df(old_df, final_df)
-    position_dfs = split_by_position(updated_df)
+    df = get_master_df(ppr=PPR)
+    position_dfs = split_by_position(df)
 
     for pos, df in position_dfs.items():
         print(f"Position: {pos}")
