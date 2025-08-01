@@ -1,3 +1,4 @@
+import os
 import typing
 
 import matplotlib.pyplot as plt
@@ -11,8 +12,10 @@ DROP_ROOKIES = True
 STARTERS_ONLY_STR = "_starters_only" if STARTERS_ONLY else ""
 DROP_ROOKIES_STR = "_drop_rookies" if DROP_ROOKIES else ""
 
-PPR = False
-PPR_STRING = "_ppr" if PPR else "_standard"
+PPR = True
+PPR_STRING = "ppr" if PPR else "standard"
+YEAR = 24
+YEAR_STRING = f"20{YEAR}"
 
 
 def split_by_position(df: pd.DataFrame) -> typing.Dict[str, pd.DataFrame]:
@@ -66,7 +69,7 @@ def plot_correlation(correlation_df: pd.DataFrame, position: str) -> None:
     plt.bar(correlation_df["variable"], correlation_df["value"])
     plt.xticks(rotation=90)
     plt.title(
-        f"Correlation with Final PPG{ STARTERS_ONLY_STR}{DROP_ROOKIES_STR}{PPR_STRING} - {position}"
+        f"Correlation with Final PPG{STARTERS_ONLY_STR}{DROP_ROOKIES_STR} {PPR_STRING} {YEAR_STRING} - {position}"
     )
     plt.xlabel("Variables")
     plt.ylabel("Correlation Coefficient")
@@ -80,8 +83,9 @@ def plot_correlation(correlation_df: pd.DataFrame, position: str) -> None:
     # set the y-axis limits to -1 and 1
     plt.ylim(-1, 1)
     # save image
+    os.makedirs(f"images/{YEAR_STRING}/{PPR_STRING}", exist_ok=True)
     plt.savefig(
-        f"images/correlation{STARTERS_ONLY_STR}{DROP_ROOKIES_STR}{PPR_STRING}_{position}.png"
+        f"images/{YEAR_STRING}/{PPR_STRING}/correlation{STARTERS_ONLY_STR}{DROP_ROOKIES_STR}_{position}.png"
     )
     # plt.show()
 
@@ -110,7 +114,7 @@ def drop_rookies(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def main() -> None:
-    df = get_master_df(ppr=PPR)
+    df = get_master_df(ppr=PPR, year=YEAR)
     position_dfs = split_by_position(df)
 
     for pos, df in position_dfs.items():

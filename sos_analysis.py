@@ -7,9 +7,11 @@ from sklearn.decomposition import PCA
 
 from utilities import get_master_df, set_window_position, split_by_position
 
-PPR = False
+PPR = True
 PPR_STRING = "PPR" if PPR else "Standard"
 RANK_STRING = "PPR_POS_AVG." if PPR else "POS_AVG."
+
+YEAR = 23
 
 MAX_RANK_DIFFERENCE = 3
 MIN_SOS_DIFFERENCE = 10
@@ -77,9 +79,14 @@ def is_sos_a_good_deciding_factor(
 
 def plot_sos(df: pd.DataFrame) -> None:
     set_window_position()
-    # drop any row with nans for PPR_AVG_RK or FULL_SOS or Final_PPG
-    df = df.dropna(subset=[RANK_STRING, "FULL_SOS", "Final_PPG"])
     position = df["POS"].iloc[0]
+    if PPR and position == "QB" or position == "K" or position == "DEF":
+        rank_string = "POS_AVG."
+    else:
+        rank_string = RANK_STRING
+
+    # drop any row with nans for PPR_AVG_RK or FULL_SOS or Final_PPG
+    df = df.dropna(subset=[rank_string, "FULL_SOS", "Final_PPG"])
     if position == "WR":
         # only keep the top 64 WRs based on Final_PPG
         df = df.nlargest(64, "Final_PPG")
@@ -87,7 +94,7 @@ def plot_sos(df: pd.DataFrame) -> None:
         # only keep the top 32 players for other positions
         df = df.nlargest(32, "Final_PPG")
 
-    ppr_avg_rank = df[RANK_STRING]
+    avg_pos_rank = df[rank_string]
     full_sos = df["FULL_SOS"]
     final_points = df["Final_PPG"]
 
@@ -98,7 +105,7 @@ def plot_sos(df: pd.DataFrame) -> None:
     cmap = plt.get_cmap("viridis")
     # Store the top points for hover labels
     tops_x, tops_y, tops_z = [], [], []
-    for x, y, z in zip(ppr_avg_rank, full_sos, final_points):
+    for x, y, z in zip(avg_pos_rank, full_sos, final_points):
         color = cmap(norm(z))
         ax.plot([x, x], [y, y], [0, z], color=color, linewidth=2)
         tops_x.append(x)
@@ -125,7 +132,7 @@ def plot_sos(df: pd.DataFrame) -> None:
 
     # Stack and fit PCA
     points = np.column_stack(
-        (ppr_avg_rank.to_numpy(), full_sos.to_numpy(), final_points.to_numpy())
+        (avg_pos_rank.to_numpy(), full_sos.to_numpy(), final_points.to_numpy())
     )
     pca = PCA(n_components=1).fit(points)
 
@@ -144,7 +151,7 @@ def plot_sos(df: pd.DataFrame) -> None:
 
 
 def main() -> None:
-    master_df = get_master_df(PPR)
+    master_df = get_master_df(ppr=PPR, year=YEAR)
     position_dfs = split_by_position(master_df)
     print(
         f"Comparing pairs of players with a max position rank difference of {MAX_RANK_DIFFERENCE}"
@@ -154,9 +161,9 @@ def main() -> None:
     )
     print()
     for position, df in position_dfs.items():
-        print(f"Analyzing position: {position} {PPR_STRING}")
+        print(f"Analyzing position: {position} {PPR_STRING} 20{YEAR}")
         is_sos_a_good_deciding_factor(df, show_comparisons=False)
-        # plot_sos(df)
+        plot_sos(df)
 
 
 if __name__ == "__main__":

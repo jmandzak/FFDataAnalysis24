@@ -9,6 +9,7 @@ import pandas as pd
 from utilities import get_master_df
 
 PPR = False
+YEAR = 23
 
 
 def set_window_position() -> None:
@@ -94,7 +95,7 @@ def main() -> None:
     ), "Please provide a position as an argument [QB, RB, WR, TE, K]"
     position = sys.argv[1]
 
-    df = get_master_df(PPR)
+    df = get_master_df(ppr=PPR, year=YEAR)
     df = remove_players_with_no_stats_last_year(df)
 
     pos_df = split_by_position(df).get(position)

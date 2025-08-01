@@ -3,10 +3,6 @@ import typing
 import matplotlib.pyplot as plt
 import pandas as pd
 
-DATA_2024_FILE = "data/master_sheet_24.csv"
-DATA_2024_FINISH = "data/fp_converted_names_standard.csv"
-DATA_2024_FINISH_PPR = "data/fp_converted_names_ppr.csv"
-
 
 def set_window_position() -> None:
     # Set the position of the matplotlib window to the top left corner of the screen
@@ -38,16 +34,15 @@ def split_by_position(df: pd.DataFrame) -> typing.Dict[str, pd.DataFrame]:
     return {pos: df[df["POS"] == pos] for pos in df["POS"].unique()}
 
 
-def get_master_df(ppr: bool) -> pd.DataFrame:
+def get_master_df(ppr: bool, year: int) -> pd.DataFrame:
     # Load the master sheet for 2024
-    df = pd.read_csv(DATA_2024_FILE)
-    if ppr:
-        # Load the PPR converted names if required
-        finish_df = pd.read_csv(DATA_2024_FINISH_PPR)
-    else:
-        # Load the standard converted names
-        finish_df = pd.read_csv(DATA_2024_FINISH)
+    YEAR_STRING = f"_{year}"
+    PPR_STRING = "_ppr" if ppr else "_standard"
+    df = pd.read_csv(f"data/master_sheet{YEAR_STRING}.csv")
+    finish_df = pd.read_csv(f"data/fp_converted_names{PPR_STRING}{YEAR_STRING}.csv")
 
     master_df = add_final_finish_to_old_df(df, finish_df)
+    # drop any rows where POS is NaN
+    master_df = master_df[master_df["POS"].notna()]
 
     return master_df
