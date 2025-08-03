@@ -3,15 +3,14 @@ import mplcursors
 import numpy as np
 import pandas as pd
 from matplotlib import colors
-from sklearn.decomposition import PCA
 
 from utilities import get_master_df, set_window_position, split_by_position
 
 PPR = True
 PPR_STRING = "PPR" if PPR else "Standard"
-RANK_STRING = "PPR_POS_AVG." if PPR else "POS_AVG."
+RANK_STRING = "POS_AVG."
 
-YEAR = 23
+YEAR = 24
 
 MAX_RANK_DIFFERENCE = 3
 MIN_SOS_DIFFERENCE = 10
@@ -80,73 +79,60 @@ def is_sos_a_good_deciding_factor(
 def plot_sos(df: pd.DataFrame) -> None:
     set_window_position()
     position = df["POS"].iloc[0]
-    if PPR and position == "QB" or position == "K" or position == "DEF":
-        rank_string = "POS_AVG."
-    else:
-        rank_string = RANK_STRING
 
     # drop any row with nans for PPR_AVG_RK or FULL_SOS or Final_PPG
-    df = df.dropna(subset=[rank_string, "FULL_SOS", "Final_PPG"])
+    df = df.dropna(subset=[RANK_STRING, "FULL_SOS", "Final_PPG"])
     if position == "WR":
-        # only keep the top 64 WRs based on Final_PPG
-        df = df.nlargest(64, "Final_PPG")
+        # only keep the top 64 WRs based on rank
+        df = df.nsmallest(64, RANK_STRING)
     else:
         # only keep the top 32 players for other positions
-        df = df.nlargest(32, "Final_PPG")
+        df = df.nsmallest(32, RANK_STRING)
 
-    avg_pos_rank = df[rank_string]
+    avg_pos_rank = df[RANK_STRING]
     full_sos = df["FULL_SOS"]
     final_points = df["Final_PPG"]
 
-    # create a 3d plot with vertical lines for each player
-    ax = plt.axes(projection="3d")
-    # Normalize colors for the lines
+    # create a 2D scatter plot: x=avg_pos_rank, y=full_sos, color by final_points (PPG)
+    ax = plt.gca()
     norm = colors.Normalize(final_points.min(), final_points.max())
-    cmap = plt.get_cmap("viridis")
-    # Store the top points for hover labels
-    tops_x, tops_y, tops_z = [], [], []
-    for x, y, z in zip(avg_pos_rank, full_sos, final_points):
-        color = cmap(norm(z))
-        ax.plot([x, x], [y, y], [0, z], color=color, linewidth=2)
-        tops_x.append(x)
-        tops_y.append(y)
-        tops_z.append(z)
-    # Plot invisible scatter for hover labels at the top of each line
+    cmap = plt.get_cmap("RdYlGn")
+    # Scale point size by PPG (final_points)
+    min_size = 40
+    max_size = 200
+    # Normalize final_points to [min_size, max_size]
+    if final_points.max() > final_points.min():
+        sizes = min_size + (final_points - final_points.min()) / (
+            final_points.max() - final_points.min()
+        ) * (max_size - min_size)
+    else:
+        sizes = np.full_like(final_points, (min_size + max_size) / 2)
     scatter = ax.scatter(
-        tops_x, tops_y, tops_z, c=[cmap(norm(z)) for z in tops_z], alpha=0
+        full_sos,
+        avg_pos_rank,
+        c=final_points,
+        cmap=cmap,
+        norm=norm,
+        s=sizes,
+        edgecolor="k",
+        alpha=0.8,
     )
     # Add interactive hover labels using mplcursors
     player_names = df["PLAYER NAME"].values
     cursor = mplcursors.cursor(scatter, hover=True)
 
-    def label_func(sel):
+    @cursor.connect("add")
+    def on_add(sel):
         idx = sel.index
         sel.annotation.set_text(player_names[idx])
+        sel.annotation.get_bbox_patch().set(fc="yellow", alpha=0.8)
 
-    cursor.connect("add", label_func)
-    mappable = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
-    plt.colorbar(mappable, ax=ax, label="Final PPG")
-    ax.set_xlabel("PPR AVG Rank")
-    ax.set_ylabel("Full SOS")
-    ax.set_zlabel("Final PPG")  # type: ignore
-
-    # Stack and fit PCA
-    points = np.column_stack(
-        (avg_pos_rank.to_numpy(), full_sos.to_numpy(), final_points.to_numpy())
-    )
-    pca = PCA(n_components=1).fit(points)
-
-    center = pca.mean_
-    direction = pca.components_[0]
-
-    # Create points along the best-fit line
-    t = np.linspace(-1, 1, 100)
-    line = center + t[:, np.newaxis] * direction
-
-    # Plot the best-fit line
-    ax.plot(line[:, 0], line[:, 1], line[:, 2], color="red", linewidth=2)
-
+    cbar = plt.colorbar(scatter, ax=ax, label="Final PPG")
+    ax.set_ylabel("AVG Pos Rank")
+    ax.set_xlabel("Full SOS")
     plt.title(f"SOS Analysis - {df['POS'].iloc[0]}")
+    plt.tight_layout()
+    plt.grid()
     plt.show()
 
 

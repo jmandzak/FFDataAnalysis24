@@ -1,10 +1,9 @@
 import os
-import typing
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from utilities import get_master_df
+from utilities import get_master_df, split_by_position
 
 STARTERS_ONLY = True
 DROP_ROOKIES = True
@@ -16,34 +15,6 @@ PPR = True
 PPR_STRING = "ppr" if PPR else "standard"
 YEAR = 24
 YEAR_STRING = f"20{YEAR}"
-
-
-def split_by_position(df: pd.DataFrame) -> typing.Dict[str, pd.DataFrame]:
-    return {pos: df[df["POS"] == pos] for pos in df["POS"].unique()}
-
-
-def drop_irrelevant_columns(df: pd.DataFrame) -> pd.DataFrame:
-    cols = df.columns.tolist()
-    cols_to_drop = [
-        # c
-        # for c in cols
-        # if "RK" in c
-        # or "BEST" in c
-        # or "WORST" in c
-        # or "TIER" in c
-        # or "DEV" in c
-        # or "POS_AVG" in c
-    ]
-    if PPR:
-        non_ppr_cols = [
-            col for col in cols if not col.startswith("PPR_") and f"PPR_{col}" in cols
-        ]
-        cols_to_drop.extend(non_ppr_cols)
-    else:
-        ppr_cols = [col for col in cols if col.startswith("PPR_")]
-        cols_to_drop.extend(ppr_cols)
-
-    return df.drop(columns=cols_to_drop)
 
 
 def get_correlation(df: pd.DataFrame) -> pd.DataFrame:
@@ -127,7 +98,6 @@ def main() -> None:
                 df = keep_top_n_players(df, 32)
         if DROP_ROOKIES:
             df = drop_rookies(df)
-        df = drop_irrelevant_columns(df)
         correlation_df = get_correlation(df)
         plot_correlation(correlation_df, pos)
 
