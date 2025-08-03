@@ -109,6 +109,13 @@ def main() -> None:
     st.session_state.selected_x = selected_x
     st.session_state.selected_y = selected_y
 
+    # Add info comment above the graph
+    st.info(
+        "All stats are from the previous season (with the exception of Final_PPG), "
+        "and all ranks are predictions for the selected season. "
+        "So if the year 2024 is selected, stats will be from the 2023 season, "
+        "ranks will be predictions for the 2024 season, and Final_PPG is how the player finished in 2024."
+    )
     # Plotly scatter plot with interactive hover labels
     fig = px.scatter(
         current_df,
