@@ -10,11 +10,22 @@ DROP_ROOKIES = True
 
 STARTERS_ONLY_STR = "_starters_only" if STARTERS_ONLY else ""
 DROP_ROOKIES_STR = "_drop_rookies" if DROP_ROOKIES else ""
+SAME_YEAR_POINTS = True
 
 PPR = True
 PPR_STRING = "ppr" if PPR else "standard"
 YEAR = 24
 YEAR_STRING = f"20{YEAR}"
+
+
+def drop_next_year_based_stats(df: pd.DataFrame) -> pd.DataFrame:
+    all_cols = df.columns.tolist()
+    bad_variables = ["RK", "STD", "BOOM", "BUST", "START", "SOS", "DEPTH", "BEST", "WORST", "TIER", "ADP", "POS_AVG."]
+    # drop columns that contain any of the bad variables
+    for var in bad_variables:
+        all_cols = [col for col in all_cols if var not in col]
+
+    return df[all_cols].reset_index(drop=True)
 
 
 def get_correlation(df: pd.DataFrame) -> pd.DataFrame:
@@ -25,7 +36,18 @@ def get_correlation(df: pd.DataFrame) -> pd.DataFrame:
     # convert the correlation matrix to a DataFrame
     correlation_df = correlation_matrix.reset_index().melt(id_vars="index")
     # only look for correlations with Final_PPG
-    correlation_df = correlation_df[correlation_df["index"] == "Final_PPG"]
+    if not SAME_YEAR_POINTS:
+        correlation_df = correlation_df[correlation_df["index"] == "Final_PPG"]
+    else:
+        correlation_df = correlation_df[correlation_df["index"] == "AVG_FAN PTS"]
+        # drop rows where variable is AVG_FAN PTS or FAN_PTS
+        correlation_df = correlation_df[
+            (correlation_df["variable"] != "AVG_FAN PTS")
+            & (correlation_df["variable"] != "FAN PTS")
+        ]
+
+    assert isinstance(correlation_df, pd.DataFrame)
+
     return correlation_df
 
 
@@ -36,7 +58,7 @@ def plot_correlation(correlation_df: pd.DataFrame, position: str) -> None:
     # sort by value
     correlation_df = correlation_df.sort_values(by="value", ascending=False)
     # drop the final_ppg row
-    correlation_df = correlation_df[correlation_df["variable"] != "Final_PPG"]
+    correlation_df = correlation_df[correlation_df["variable"] != "Final_PPG"]  # type: ignore
     plt.bar(correlation_df["variable"], correlation_df["value"])
     plt.xticks(rotation=90)
     plt.title(
@@ -55,10 +77,10 @@ def plot_correlation(correlation_df: pd.DataFrame, position: str) -> None:
     plt.ylim(-1, 1)
     # save image
     os.makedirs(f"images/{YEAR_STRING}/{PPR_STRING}", exist_ok=True)
+    same_year_str = "" if not SAME_YEAR_POINTS else "_same_year_points"
     plt.savefig(
-        f"images/{YEAR_STRING}/{PPR_STRING}/correlation{STARTERS_ONLY_STR}{DROP_ROOKIES_STR}_{position}.png"
+        f"images/{YEAR_STRING}/{PPR_STRING}/correlation{same_year_str}{STARTERS_ONLY_STR}{DROP_ROOKIES_STR}_{position}.png"
     )
-    # plt.show()
 
 
 def random_corrections(df: pd.DataFrame) -> pd.DataFrame:
@@ -80,7 +102,7 @@ def keep_top_n_players(df: pd.DataFrame, n: int) -> pd.DataFrame:
 
 def drop_rookies(df: pd.DataFrame) -> pd.DataFrame:
     # if AVG_FAN PTS is 0, then it's a rookie
-    df = df[df["AVG_FAN PTS"] != 0]
+    df = df[df["AVG_FAN PTS"] != 0]  # type: ignore
     return df.reset_index(drop=True)
 
 
@@ -98,6 +120,8 @@ def main() -> None:
                 df = keep_top_n_players(df, 32)
         if DROP_ROOKIES:
             df = drop_rookies(df)
+        if SAME_YEAR_POINTS:
+            df = drop_next_year_based_stats(df)
         correlation_df = get_correlation(df)
         plot_correlation(correlation_df, pos)
 
