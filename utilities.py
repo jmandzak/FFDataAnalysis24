@@ -1,3 +1,4 @@
+import os
 import typing
 
 import matplotlib.pyplot as plt
@@ -25,8 +26,6 @@ def add_final_finish_to_old_df(
     old_df["Final_PPG"] = old_df["PLAYER NAME"].map(final_ppg_dict)
     # drop rows where Final_PPG is NaN
     old_df = old_df[old_df["Final_PPG"].notna()]
-    # any value that has %, remove the % sign and convert to float
-    old_df = old_df.replace("%", "", regex=True)
     return old_df
 
 
@@ -86,16 +85,24 @@ def _fix_standard_adp(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def get_master_df(ppr: bool, year: int) -> pd.DataFrame:
-    # Load the master sheet for 2024
     YEAR_STRING = f"_{year}"
     PPR_STRING = "_ppr" if ppr else "_standard"
-    df = pd.read_csv(f"data/master_sheet{YEAR_STRING}.csv")
+    current_dir = os.path.dirname(__file__)
+    df = pd.read_csv(
+        os.path.join(current_dir, "data", f"master_sheet{YEAR_STRING}.csv")
+    )
     df = _fix_standard_adp(df)
-    finish_df = pd.read_csv(f"data/fp_converted_names{PPR_STRING}{YEAR_STRING}.csv")
 
-    master_df = add_final_finish_to_old_df(df, finish_df)
+    final_ppg_file = f"fp_converted_names{PPR_STRING}{YEAR_STRING}.csv"
+    if os.path.exists(final_ppg_file):
+        finish_df = pd.read_csv(os.path.join(current_dir, "data", final_ppg_file))
+        master_df = add_final_finish_to_old_df(df, finish_df)
+    else:
+        master_df = df
+
     # drop any rows where POS is NaN
     master_df = master_df[master_df["POS"].notna()]
+    master_df = master_df.replace("%", "", regex=True)
 
     if ppr:
         master_df = _set_ppr_columns_for_non_ppr_positions(master_df)
