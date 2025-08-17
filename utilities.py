@@ -97,7 +97,7 @@ def get_master_df(ppr: bool, year: int) -> pd.DataFrame:
         current_dir, "data", f"fp_converted_names{PPR_STRING}{YEAR_STRING}.csv"
     )
     if os.path.exists(final_ppg_file):
-        finish_df = pd.read_csv(os.path.join(current_dir, "data", final_ppg_file))
+        finish_df = pd.read_csv(final_ppg_file)
         master_df = add_final_finish_to_old_df(df, finish_df)
     else:
         master_df = df
