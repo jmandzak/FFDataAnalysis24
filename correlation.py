@@ -1,26 +1,30 @@
 import os
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 from utilities import get_master_df, split_by_position
 
-STARTERS_ONLY = True
-DROP_ROOKIES = True
-
-STARTERS_ONLY_STR = "_starters_only" if STARTERS_ONLY else ""
-DROP_ROOKIES_STR = "_drop_rookies" if DROP_ROOKIES else ""
-SAME_YEAR_POINTS = True
-
-PPR = True
-PPR_STRING = "ppr" if PPR else "standard"
-YEAR = 25
-YEAR_STRING = f"20{YEAR}"
+YEARS = [25, 24, 23]
 
 
 def drop_next_year_based_stats(df: pd.DataFrame) -> pd.DataFrame:
     all_cols = df.columns.tolist()
-    bad_variables = ["RK", "STD", "BOOM", "BUST", "START", "SOS", "DEPTH", "BEST", "WORST", "TIER", "ADP", "POS_AVG."]
+    bad_variables = [
+        "RK",
+        "STD",
+        "BOOM",
+        "BUST",
+        "START",
+        "SOS",
+        "DEPTH",
+        "BEST",
+        "WORST",
+        "TIER",
+        "ADP",
+        "POS_AVG.",
+    ]
     # drop columns that contain any of the bad variables
     for var in bad_variables:
         all_cols = [col for col in all_cols if var not in col]
@@ -38,9 +42,7 @@ def get_correlation(df: pd.DataFrame, same_year: bool) -> pd.DataFrame:
     # only look for correlations with Final_PPG
     if not same_year:
         correlation_df = correlation_df[correlation_df["index"] == "Final_PPG"]
-        correlation_df = correlation_df[
-            (correlation_df["variable"] != "Final_PPG")
-        ]
+        correlation_df = correlation_df[(correlation_df["variable"] != "Final_PPG")]
     else:
         correlation_df = correlation_df[correlation_df["index"] == "AVG_FAN PTS"]
         # drop rows where variable is AVG_FAN PTS or FAN_PTS
@@ -54,35 +56,49 @@ def get_correlation(df: pd.DataFrame, same_year: bool) -> pd.DataFrame:
     return correlation_df
 
 
-def plot_correlation(correlation_df: pd.DataFrame, position: str, same_year: bool) -> None:
-    plt.figure(figsize=(10, 6))
+def plot_correlation(
+    correlation_df: pd.DataFrame,
+    position: str,
+    same_year: bool,
+    year: int,
+    ppr: bool,
+    starters_only: bool,
+    should_drop_rookies: bool,
+) -> None:
     # drop nan values
     correlation_df = correlation_df.dropna()
+    # duplicate value column but make it absolute
+    correlation_df = correlation_df.copy()
+    correlation_df["abs_value"] = correlation_df["value"].abs()
     # sort by value
-    correlation_df = correlation_df.sort_values(by="value", ascending=False)
-    plt.bar(correlation_df["variable"], correlation_df["value"])
+    correlation_df = correlation_df.sort_values(by="abs_value", ascending=False)
+    plt.figure(figsize=(14, 6))
+    bar_heights = np.abs(correlation_df["value"])
+    colors = ["green" if val >= 0 else "red" for val in correlation_df["value"]]
+    plt.bar(correlation_df["variable"], bar_heights, color=colors)
     plt.xticks(rotation=90)
-    same_year_str = "Same Year Points" if same_year else "Final PPG"
-    plt.title(
-        f"Correlation with {same_year_str}{STARTERS_ONLY_STR}{DROP_ROOKIES_STR} {PPR_STRING} {YEAR_STRING} - {position}"
-    )
     plt.xlabel("Variables")
     plt.ylabel("Correlation Coefficient")
-    # plot a horizontal red line at y=0.5 and y=-0.5
-    plt.axhline(y=0.5, color="r", linestyle="--", label="0.5 Threshold")
-    plt.axhline(y=-0.5, color="r", linestyle="--", label="-0.5 Threshold")
-    # plot another line at y=0.75 and y=-0.75
-    plt.axhline(y=0.75, color="g", linestyle="--", label="0.75 Threshold")
-    plt.axhline(y=-0.75, color="g", linestyle="--", label="-0.75 Threshold")
     plt.tight_layout()
     # set the y-axis limits to -1 and 1
-    plt.ylim(-1, 1)
+    plt.ylim(0, 1)
+    same_year_str = "Same Year Points" if same_year else "Final PPG"
+    plt.title(f"{position} Correlation with {same_year_str}")
     # save image
-    os.makedirs(f"images/{YEAR_STRING}/{PPR_STRING}", exist_ok=True)
-    same_year_str = "" if not SAME_YEAR_POINTS else "_same_year_points"
-    plt.savefig(
-        f"images/{YEAR_STRING}/{PPR_STRING}/correlation{same_year_str}{STARTERS_ONLY_STR}{DROP_ROOKIES_STR}_{position}.png"
+    ppg_string = "same_year" if same_year else "final_ppg"
+    rookies_str = "drop_rookies" if should_drop_rookies else "keep_rookies"
+    starters_str = "top_ranked" if starters_only else "all_players"
+    player_string = f"{rookies_str}_{starters_str}"
+    ppr_string = "ppr" if ppr else "standard"
+    os.makedirs(
+        f"images/correlation/{year}/{ppr_string}/{ppg_string}/{player_string}",
+        exist_ok=True,
     )
+    plt.tight_layout()
+    plt.savefig(
+        f"images/correlation/{year}/{ppr_string}/{ppg_string}/{player_string}/{position}.png"
+    )
+    plt.close()
 
 
 def random_corrections(df: pd.DataFrame) -> pd.DataFrame:
@@ -108,24 +124,57 @@ def drop_rookies(df: pd.DataFrame) -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
-def main() -> None:
-    df = get_master_df(ppr=PPR, year=YEAR)
+def process_sample(
+    year: int,
+    ppr: bool,
+    starters_only: bool,
+    should_drop_rookies: bool,
+    same_year_points: bool,
+) -> None:
+    df = get_master_df(ppr=ppr, year=year)
     position_dfs = split_by_position(df)
 
     for pos, df in position_dfs.items():
+        if pos == "UNKNOWN":
+            continue
         print(f"Position: {pos}")
         # keep only the top 32 players unless it's a WR, then keep top 64
-        if STARTERS_ONLY:
+        if starters_only:
             if pos == "WR":
                 df = keep_top_n_players(df, 64)
             else:
                 df = keep_top_n_players(df, 32)
-        if DROP_ROOKIES:
+        if drop_rookies:
             df = drop_rookies(df)
-        if SAME_YEAR_POINTS:
+        if same_year_points:
             df = drop_next_year_based_stats(df)
-        correlation_df = get_correlation(df, SAME_YEAR_POINTS)
-        plot_correlation(correlation_df, pos, SAME_YEAR_POINTS)
+        correlation_df = get_correlation(df, same_year_points)
+        plot_correlation(
+            correlation_df,
+            pos,
+            same_year=same_year_points,
+            year=year,
+            ppr=ppr,
+            starters_only=starters_only,
+            should_drop_rookies=should_drop_rookies,
+        )
+
+
+def main() -> None:
+    for year in YEARS:
+        for ppr in [True, False]:
+            for starters_only in [True, False]:
+                for should_drop_rookies in [True, False]:
+                    for same_year_points in [True, False]:
+                        if not same_year_points and year == 25:
+                            continue  # don't have final_ppg for year 25 yet
+                        process_sample(
+                            year,
+                            ppr,
+                            starters_only,
+                            should_drop_rookies,
+                            same_year_points,
+                        )
 
 
 if __name__ == "__main__":
