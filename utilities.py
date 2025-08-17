@@ -93,7 +93,9 @@ def get_master_df(ppr: bool, year: int) -> pd.DataFrame:
     )
     df = _fix_standard_adp(df)
 
-    final_ppg_file = f"fp_converted_names{PPR_STRING}{YEAR_STRING}.csv"
+    final_ppg_file = os.path.join(
+        current_dir, "data", f"fp_converted_names{PPR_STRING}{YEAR_STRING}.csv"
+    )
     if os.path.exists(final_ppg_file):
         finish_df = pd.read_csv(os.path.join(current_dir, "data", final_ppg_file))
         master_df = add_final_finish_to_old_df(df, finish_df)

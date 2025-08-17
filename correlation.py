@@ -42,13 +42,14 @@ def get_correlation(df: pd.DataFrame, same_year: bool) -> pd.DataFrame:
     # only look for correlations with Final_PPG
     if not same_year:
         correlation_df = correlation_df[correlation_df["index"] == "Final_PPG"]
-        correlation_df = correlation_df[(correlation_df["variable"] != "Final_PPG")]
+        correlation_df = correlation_df[correlation_df["variable"] != "Final_PPG"]
     else:
         correlation_df = correlation_df[correlation_df["index"] == "AVG_FAN PTS"]
         # drop rows where variable is AVG_FAN PTS or FAN_PTS
         correlation_df = correlation_df[
             (correlation_df["variable"] != "AVG_FAN PTS")
             & (correlation_df["variable"] != "FAN PTS")
+            & (correlation_df["variable"] != "Final_PPG")
         ]
 
     assert isinstance(correlation_df, pd.DataFrame)
@@ -132,6 +133,7 @@ def process_sample(
     same_year_points: bool,
 ) -> None:
     df = get_master_df(ppr=ppr, year=year)
+    random_corrections(df)
     position_dfs = split_by_position(df)
 
     for pos, df in position_dfs.items():
