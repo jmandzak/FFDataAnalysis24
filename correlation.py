@@ -115,7 +115,7 @@ def random_corrections(df: pd.DataFrame) -> pd.DataFrame:
 
 def keep_top_n_players(df: pd.DataFrame, n: int) -> pd.DataFrame:
     # keep only the top n players based on POS_RK
-    top_players = df.nlargest(n, "POS_RK")
+    top_players = df.nsmallest(n, "POS_RK")
     return top_players.reset_index(drop=True)
 
 
@@ -150,6 +150,7 @@ def process_sample(
             df = drop_rookies(df)
         if same_year_points:
             df = drop_next_year_based_stats(df)
+
         correlation_df = get_correlation(df, same_year_points)
         plot_correlation(
             correlation_df,
